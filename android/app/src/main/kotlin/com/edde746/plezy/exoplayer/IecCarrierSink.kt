@@ -172,8 +172,27 @@ internal class IecCarrierSink(
    */
   private fun isDtsHd(format: Format): Boolean = format.sampleMimeType == MimeTypes.AUDIO_DTS_HD
 
+  /**
+   * Whether raw TrueHD may be offered when the carrier cannot be used.
+   *
+   * A route that publishes no `AUDIO_FORMAT_IEC61937` profile fails the carrier probe, and the
+   * binary rule above then decodes every TrueHD stream even where the route publishes
+   * `AUDIO_FORMAT_DOLBY_TRUEHD` and drains it correctly. Such routes exist: an eARC chain
+   * publishing PCM, AC3, E-AC3, E-AC3 JOC and TrueHD but not IEC 61937 bitstreams raw TrueHD for
+   * other players while this sink hands it to the FFmpeg decoder and emits 8-channel PCM, which
+   * the same chain will not render.
+   *
+   * Deferring to [defaultSink] rather than probing here keeps one decision in one place: media3
+   * consults the same [androidx.media3.exoplayer.audio.AudioCapabilities] it will use to configure
+   * the track, so a route that does not publish the encoding still lands on the decoder. Only
+   * [directOutputBlocked] is checked first, so downmix, normalization and the user setting keep
+   * forcing decoded PCM as before.
+   */
+  private fun rawTrueHdUsable(format: Format): Boolean = isTrueHd(format) && !directOutputBlocked(format)
+
   override fun supportsFormat(format: Format): Boolean = when {
     shouldUseCarrier(format) -> true
+    rawTrueHdUsable(format) -> defaultSink.supportsFormat(format)
     isTrueHd(format) -> false
     isDtsHd(format) && carrierRouteAvailable(format) -> false
     else -> defaultSink.supportsFormat(format)
@@ -181,6 +200,7 @@ internal class IecCarrierSink(
 
   override fun getFormatSupport(format: Format): Int = when {
     shouldUseCarrier(format) -> AudioSink.SINK_FORMAT_SUPPORTED_DIRECTLY
+    rawTrueHdUsable(format) -> defaultSink.getFormatSupport(format)
     isTrueHd(format) -> AudioSink.SINK_FORMAT_UNSUPPORTED
     isDtsHd(format) && carrierRouteAvailable(format) -> AudioSink.SINK_FORMAT_UNSUPPORTED
     else -> defaultSink.getFormatSupport(format)
