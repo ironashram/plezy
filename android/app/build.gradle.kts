@@ -270,6 +270,12 @@ android {
   buildToolsVersion = "36.1.0"
   ndkVersion = "29.0.14206865"
 
+  buildFeatures {
+    // The provider authorities read BuildConfig.APPLICATION_ID so a suffixed build declares its
+    // own; AGP does not generate the class unless asked.
+    buildConfig = true
+  }
+
   // Android Automotive OS driver-distraction state (CarUxRestrictionsManager). This is a platform
   // stub, not a shipped dependency: the classes exist only on AAOS images, so every use is guarded
   // by FEATURE_AUTOMOTIVE and the manifest declares `uses-library android.car required=false`.
@@ -281,7 +287,10 @@ android {
   }
 
   defaultConfig {
-    applicationId = "com.edde746.plezy"
+    // A locally built APK is signed with a different key, so it can never replace an official
+    // install: Android enforces that on every install path. Suffixed so it lands beside one
+    // instead, which also keeps a known-good client on the device while this one is tested.
+    applicationId = "com.edde746.plezy.local"
     minSdk = 25 // Fire OS 6.x (API 25); :libmpv shares the same floor
     targetSdk = flutter.targetSdkVersion
     versionCode = flutter.versionCode

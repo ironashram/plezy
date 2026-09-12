@@ -7,6 +7,7 @@ import android.graphics.BitmapFactory
 import android.net.Uri
 import android.os.ParcelFileDescriptor
 import android.system.Os
+import com.edde746.plezy.BuildConfig
 import java.io.ByteArrayOutputStream
 import java.io.File
 import java.io.FileNotFoundException
@@ -20,7 +21,10 @@ import java.util.concurrent.TimeUnit
 
 class SystemShelfArtworkProvider : ContentProvider() {
   companion object {
-    const val AUTHORITY = "com.edde746.plezy.systemshelf.artwork"
+    // Derived rather than literal so a suffixed build (a local one installed beside an official
+    // APK) declares its own authority: the framework rejects an install whose provider authority
+    // another package already holds.
+    val AUTHORITY = "${BuildConfig.APPLICATION_ID}.systemshelf.artwork"
   }
 
   override fun onCreate(): Boolean = context != null
