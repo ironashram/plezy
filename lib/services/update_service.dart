@@ -15,7 +15,7 @@ import 'base_shared_preferences_service.dart';
 /// via auto_updater for native update dialogs and in-app installs.
 /// On all other platforms: falls back to GitHub API check + browser link dialog.
 class UpdateService {
-  static const String _githubRepo = 'edde746/plezy';
+  static const String _githubRepo = 'ironashram/plezy';
   static const String _feedUrl = 'https://cdn.jsdelivr.net/gh/edde746/plezy@appcast/appcast.xml';
 
   static const String _keySkippedVersion = 'update_skipped_version';
@@ -176,6 +176,7 @@ class UpdateService {
             'currentVersion': currentVersion,
             'latestVersion': cleanVersion,
             'releaseUrl': data['html_url'] as String,
+            'apkUrl': _apkAssetUrl(data['assets']),
             'releaseName': data['name'] as String? ?? 'Version $cleanVersion',
             'releaseNotes': data['body'] as String? ?? '',
             'publishedAt': data['published_at'] as String,
@@ -211,6 +212,19 @@ class UpdateService {
 
   /// Parse version string into list of integers
   /// Handles versions like "1.2.3+4" by taking only the numeric parts
+  /// Download URL of the release's Android package, when the release ships one.
+  static String? _apkAssetUrl(Object? assets) {
+    if (assets is! List) return null;
+    for (final asset in assets) {
+      if (asset is! Map) continue;
+      final name = asset['name'];
+      if (name is! String || !name.toLowerCase().endsWith('.apk')) continue;
+      final url = asset['browser_download_url'];
+      if (url is String) return url;
+    }
+    return null;
+  }
+
   static List<int> _parseVersionParts(String version) {
     return version.split('.').map((p) {
       final numPart = p.split('+').first.split('-').first;

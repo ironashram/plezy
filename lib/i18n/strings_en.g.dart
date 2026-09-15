@@ -372,6 +372,15 @@ class Translations$update$en {
 	/// en: 'View Release'
 	String get viewRelease => 'View Release';
 
+	/// en: 'Install Update'
+	String get installUpdate => 'Install Update';
+
+	/// en: 'Downloading update'
+	String get downloadingUpdate => 'Downloading update';
+
+	/// en: 'Failed to download the update'
+	String get downloadFailed => 'Failed to download the update';
+
 	/// en: 'You are on the latest version'
 	String get latestVersion => 'You are on the latest version';
 
@@ -7146,6 +7155,9 @@ extension on Translations {
 			'update.currentVersion' => ({required Object version}) => 'Current: ${version}',
 			'update.skipVersion' => 'Skip This Version',
 			'update.viewRelease' => 'View Release',
+			'update.installUpdate' => 'Install Update',
+			'update.downloadingUpdate' => 'Downloading update',
+			'update.downloadFailed' => 'Failed to download the update',
 			'update.latestVersion' => 'You are on the latest version',
 			'update.checkFailed' => 'Failed to check for updates',
 			'settings.title' => 'Settings',
@@ -7555,11 +7567,11 @@ extension on Translations {
 			'fileInfo.sidecarPath' => 'Sidecar Path',
 			'fileInfo.sourceStream' => 'Copied From',
 			'fileInfo.temporary' => 'Temporary',
+			_ => null,
+		} ?? switch (path) {
 			'fileInfo.timeBase' => 'Time Base',
 			'fileInfo.overallBitrate' => 'Overall Bitrate',
 			'fileInfo.path' => 'Path',
-			_ => null,
-		} ?? switch (path) {
 			'fileInfo.fileName' => 'File Name',
 			'fileInfo.size' => 'Size',
 			'fileInfo.totalSize' => 'Total Size',
@@ -8069,11 +8081,11 @@ extension on Translations {
 			'libraries.confirmActionMessage' => 'Are you sure you want to perform this action?',
 			'libraries.showLibrary' => 'Show library',
 			'libraries.hideLibrary' => 'Hide library',
+			_ => null,
+		} ?? switch (path) {
 			'libraries.libraryOptions' => 'Library options',
 			'libraries.content' => 'library content',
 			'libraries.selectLibrary' => 'Select library',
-			_ => null,
-		} ?? switch (path) {
 			'libraries.filtersWithCount' => ({required Object count}) => 'Filters (${count})',
 			'libraries.noRecommendations' => 'No recommendations available',
 			'libraries.noCollections' => 'No collections in this library',
@@ -8583,11 +8595,11 @@ extension on Translations {
 			'downloads.resumeDownload' => 'Resume download',
 			'downloads.cancelledDownload' => 'Canceled download',
 			'downloads.syncingFile' => ({required Object file, required Object status}) => '${file} (syncing ${status})',
+			_ => null,
+		} ?? switch (path) {
 			'downloads.downloadedFileClickToComplete' => ({required Object file}) => 'Downloaded ${file} - Click to complete',
 			'downloads.partialDownloadClickToComplete' => 'Partially downloaded - Click to complete',
 			'downloads.deleting' => 'Deleting...',
-			_ => null,
-		} ?? switch (path) {
 			'downloads.deletingWithProgress' => ({required Object title, required Object current, required Object total}) => 'Deleting ${title}... (${current} of ${total})',
 			'downloads.queuedTooltip' => 'Queued',
 			'downloads.queuedFilesTooltip' => ({required Object files}) => 'Queued ${files}',

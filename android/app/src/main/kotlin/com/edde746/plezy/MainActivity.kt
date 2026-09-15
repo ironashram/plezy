@@ -136,6 +136,7 @@ class MainActivity : FlutterActivity() {
   private var activityStarted = false
   private val externalPlayerChannel = ExternalPlayerChannel(this)
   private val userCertificateChannel = UserCertificateChannel()
+  private val apkInstallerChannel = ApkInstallerChannel(this)
   private val exitDiagnosticsRequested = AtomicBoolean(false)
 
   private inline fun logTextInputDiag(message: () -> String) {
@@ -962,6 +963,7 @@ class MainActivity : FlutterActivity() {
 
     externalPlayerChannel.attach(flutterEngine.dartExecutor.binaryMessenger)
     userCertificateChannel.attach(flutterEngine.dartExecutor.binaryMessenger)
+    apkInstallerChannel.attach(flutterEngine.dartExecutor.binaryMessenger)
 
     // Splash screen theme: persist user's chosen theme for next launch (API 31+)
     MethodChannel(flutterEngine.dartExecutor.binaryMessenger, THEME_CHANNEL).setMethodCallHandler { call, result ->

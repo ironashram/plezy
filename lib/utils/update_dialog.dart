@@ -1,10 +1,14 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../i18n/strings.g.dart';
+import '../services/apk_update_installer.dart';
 import '../services/update_service.dart';
 import '../widgets/dialog_action_button.dart';
 import 'dialogs.dart';
+import 'snackbar_helper.dart';
 
 Future<void> showUpdateAvailableDialog(
   BuildContext context,
@@ -18,6 +22,8 @@ Future<void> showUpdateAvailableDialog(
     builder: (dialogContext) {
       final latestVersion = updateInfo['latestVersion'] as String;
       final releaseUrl = updateInfo['releaseUrl'] as String;
+      final apkUrl = updateInfo['apkUrl'] as String?;
+      final canInstall = Platform.isAndroid && apkUrl != null;
 
       return AlertDialog(
         title: Text(title),
@@ -55,8 +61,24 @@ Future<void> showUpdateAvailableDialog(
               if (dialogContext.mounted) Navigator.pop(dialogContext);
             },
             label: t.update.viewRelease,
-            isPrimary: true,
+            isPrimary: !canInstall,
           ),
+          if (canInstall)
+            DialogActionButton(
+              onPressed: () async {
+                Navigator.pop(dialogContext);
+                // The download outlives this dialog, so progress and failure are
+                // reported without its context.
+                showMainSnackBar(t.update.downloadingUpdate);
+                try {
+                  await ApkUpdateInstaller.downloadAndInstall(apkUrl);
+                } catch (_) {
+                  showGlobalErrorSnackBar(t.update.downloadFailed);
+                }
+              },
+              label: t.update.installUpdate,
+              isPrimary: true,
+            ),
         ],
       );
     },

@@ -112,6 +112,9 @@
     "currentVersion": "Current: ${version}",
     "skipVersion": "Skip This Version",
     "viewRelease": "View Release",
+    "installUpdate": "Install Update",
+    "downloadingUpdate": "Downloading update",
+    "downloadFailed": "Failed to download the update",
     "latestVersion": "You are on the latest version",
     "checkFailed": "Failed to check for updates"
   },
