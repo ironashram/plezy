@@ -383,6 +383,13 @@ android {
         debugSymbolLevel = "NONE"
       }
     }
+
+    getByName("profile") {
+      val keystorePropertiesFile = rootProject.file("key.properties")
+      if (keystorePropertiesFile.exists()) {
+        signingConfig = signingConfigs.getByName("release")
+      }
+    }
   }
 
   // Instrumentation normally runs against `debug`; the R8 reachability gate opts into the
