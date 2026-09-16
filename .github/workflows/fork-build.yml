@@ -1,0 +1,236 @@
+name: Fork Build
+
+on:
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: Tag to publish the artifacts under; omit to build artifacts only
+        default: ''
+        type: string
+      build_android:
+        description: Build Android
+        default: true
+        type: boolean
+      build_linux:
+        description: Build Linux
+        default: true
+        type: boolean
+
+env:
+  FLUTTER_VERSION: "3.47.1"
+  FORK_DART_DEFINES: --dart-define=ENABLE_UPDATE_CHECK=true
+  LINUX_APT_PACKAGES: >
+    clang cmake meson ninja-build pkg-config nasm libgtk-3-dev libevdev-dev liblzma-dev
+    libstdc++-12-dev libasound2-dev libass-dev libfreetype-dev libfontconfig-dev libfribidi-dev
+    libharfbuzz-dev libepoxy-dev libegl-dev libgl-dev libgnutls28-dev libpipewire-0.3-dev
+    libva-dev libvdpau-dev libx11-dev libxext-dev libxrandr-dev libxcursor-dev libxi-dev
+    libxss-dev libxpresent-dev libxkbcommon-dev libpulse-dev libdbus-1-dev libdrm-dev
+    libdisplay-info-dev libgbm-dev libwayland-dev wayland-protocols liblcms2-dev libmujs-dev liblua5.2-dev
+    ruby ruby-dev rubygems build-essential rpm libarchive-tools imagemagick libcurl4-openssl-dev
+
+jobs:
+  build-android:
+    if: ${{ inputs.build_android }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+
+      - name: Setup Java
+        uses: actions/setup-java@03ad4de0992f5dab5e18fcb136590ce7c4a0ac95 # v5
+        with:
+          distribution: "temurin"
+          java-version: "21"
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2
+        with:
+          channel: "stable"
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          cache: true
+          pub-cache: false
+
+      - name: Cache Pub dependencies
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
+        with:
+          path: ~/.pub-cache
+          key: ${{ runner.os }}-${{ runner.arch }}-pub-${{ hashFiles('pubspec.yaml', 'pubspec.lock') }}
+
+      - name: Cache Gradle
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties') }}
+
+      - name: Install dependencies
+        run: flutter pub get --enforce-lockfile --no-example
+
+      - name: Configure signing
+        run: |
+          echo "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" | base64 --decode > android/app/upload-keystore.jks
+          cat > android/key.properties << EOF
+          storePassword=${{ secrets.ANDROID_STORE_PASSWORD }}
+          keyPassword=${{ secrets.ANDROID_KEY_PASSWORD }}
+          keyAlias=${{ secrets.ANDROID_KEY_ALIAS }}
+          storeFile=upload-keystore.jks
+          EOF
+
+      - name: Build APK
+        run: >
+          flutter build apk --profile --target-platform android-arm
+          ${{ env.FORK_DART_DEFINES }}
+          --dart-define=PLEZY_AGENT_CONTROL=true
+
+      - name: Clean up keystore
+        if: always()
+        run: rm -f android/app/upload-keystore.jks android/key.properties
+
+      - name: Report signer
+        run: |
+          BUILD_TOOLS=$(ls -d "$ANDROID_HOME"/build-tools/* | sort -V | tail -1)
+          "$BUILD_TOOLS/apksigner" verify --print-certs build/app/outputs/flutter-apk/app-profile.apk
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: plezy-android-armeabi-v7a
+          path: build/app/outputs/flutter-apk/app-profile.apk
+
+  build-linux:
+    if: ${{ inputs.build_linux }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2
+        with:
+          channel: "stable"
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          cache: true
+          pub-cache: false
+
+      - name: Cache Pub dependencies
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
+        with:
+          path: ~/.pub-cache
+          key: ${{ runner.os }}-${{ runner.arch }}-pub-${{ hashFiles('pubspec.yaml', 'pubspec.lock') }}
+
+      - name: Install Linux dependencies
+        shell: bash
+        run: |
+          read -r -a packages <<< "$LINUX_APT_PACKAGES"
+          for attempt in 1 2 3; do
+            if sudo apt-get update -o Acquire::Retries=3 && sudo apt-get install -y -o Acquire::Retries=3 "${packages[@]}"; then
+              exit 0
+            fi
+            sudo apt-get clean
+            sudo rm -rf /var/lib/apt/lists/*
+            sleep $((attempt * 15))
+          done
+          exit 1
+
+      - name: Cache libmpv prefix
+        id: libmpv-cache
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
+        with:
+          path: libmpv-prefix
+          key: libmpv-${{ runner.arch }}-${{ hashFiles('mpv-build.lock.json') }}
+
+      - name: Fetch libmpv
+        if: steps.libmpv-cache.outputs.cache-hit != 'true'
+        shell: bash
+        run: |
+          command -v zstd >/dev/null 2>&1 || { sudo apt-get update && sudo apt-get install -y --no-install-recommends zstd; }
+          python3 scripts/fetch_linux_libmpv.py --dest libmpv-prefix
+
+      - name: Install dependencies
+        run: flutter pub get --enforce-lockfile --no-example
+
+      - name: Build Linux
+        shell: bash
+        run: flutter build linux --release ${{ env.FORK_DART_DEFINES }}
+        env:
+          PKG_CONFIG_PATH: ${{ github.workspace }}/libmpv-prefix/lib/pkgconfig:${{ github.workspace }}/libmpv-prefix/lib/x86_64-linux-gnu/pkgconfig
+
+      - name: Resolve bundle directory
+        shell: bash
+        run: |
+          bundle_dir=build/linux/x64/release/bundle
+          if [[ ! -d "$bundle_dir" ]]; then
+            echo "ERROR: Linux bundle directory not found" >&2
+            exit 1
+          fi
+          echo "BUNDLE_DIR=$bundle_dir" >> "$GITHUB_ENV"
+
+      # The plane needs the pinned Wayland-enabled libmpv, and bundle-libs.sh
+      # supplies everything that libmpv itself links.
+      - name: Copy libmpv into bundle
+        shell: bash
+        run: |
+          BUNDLE_LIB="$BUNDLE_DIR/lib"
+          LIBMPV_DIR=$(dirname "$(find libmpv-prefix -name 'libmpv.so' | head -1)")
+          cp -a "$LIBMPV_DIR"/libmpv.so* "$BUNDLE_LIB/"
+          cp -a libmpv-prefix/lib/libshaderc_shared.so* "$BUNDLE_LIB/"
+
+      - name: Bundle shared libraries
+        shell: bash
+        run: bash linux/packaging/bundle-libs.sh "$BUNDLE_DIR"
+
+      - name: Copy wrapper script into bundle
+        shell: bash
+        run: cp linux/packaging/plezy.sh "$BUNDLE_DIR/plezy.sh"
+
+      - name: Verify every unbundled library the bundle needs is declared
+        shell: bash
+        run: python3 linux/packaging/check-bundle-host-deps.py "$BUNDLE_DIR"
+
+      - name: Create tarball
+        shell: bash
+        run: |
+          cd "$BUNDLE_DIR"
+          tar -czf "$GITHUB_WORKSPACE/plezy-linux-x64.tar.gz" *
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: plezy-linux-x64
+          path: plezy-linux-x64.tar.gz
+
+  release:
+    needs: [build-android, build-linux]
+    if: ${{ always() && inputs.release_tag != '' && !contains(needs.*.result, 'failure') && !contains(needs.*.result, 'cancelled') }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+        with:
+          path: artifacts
+
+      - name: Publish release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          shopt -s nullglob
+          assets=()
+          for apk in artifacts/plezy-android-armeabi-v7a/*.apk; do
+            cp "$apk" plezy.apk
+            assets+=(plezy.apk)
+          done
+          for tarball in artifacts/plezy-linux-x64/*.tar.gz; do
+            assets+=("$tarball")
+          done
+          if [[ ${#assets[@]} -eq 0 ]]; then
+            echo "ERROR: no artifacts to publish" >&2
+            exit 1
+          fi
+          gh release create "${{ inputs.release_tag }}" "${assets[@]}" \
+            --repo "${{ github.repository }}" \
+            --title "${{ inputs.release_tag }}" \
+            --notes "Fork build of upstream with the TrueHD passthrough and Live TV fixes."

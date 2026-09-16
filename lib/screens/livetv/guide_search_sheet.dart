@@ -118,11 +118,24 @@ class _GuideSearchSheetState extends State<GuideSearchSheet> with ControllerDisp
     // pays the programs × channels matching cost. The lookback window can
     // return programs that already finished — drop those.
     final nowEpoch = now.millisecondsSinceEpoch ~/ 1000;
+
+    // Index on the identifiers the matcher keys on, keeping channel order within a
+    // bucket so the first candidate is still the first channel that would have matched.
+    // A linear scan per program is minutes of work on a large lineup.
+    final channelsByIdentifier = <String, List<LiveTvChannel>>{};
+    for (final channel in widget.channels) {
+      for (final identifier in {channel.key, ?channel.identifier}) {
+        (channelsByIdentifier[identifier] ??= <LiveTvChannel>[]).add(channel);
+      }
+    }
+
     final resolved = <({LiveTvProgram program, LiveTvChannel channel})>[];
     for (final program in fetched) {
       final endsAt = program.endsAt;
       if (endsAt != null && endsAt <= nowEpoch) continue;
-      for (final channel in widget.channels) {
+      final identifier = liveTvNonEmpty(program.channelIdentifier);
+      if (identifier == null) continue;
+      for (final channel in channelsByIdentifier[identifier] ?? const <LiveTvChannel>[]) {
         if (liveTvProgramMatchesChannel(program, channel)) {
           resolved.add((program: program, channel: channel));
           break;
@@ -253,25 +266,35 @@ class _GuideSearchSheetState extends State<GuideSearchSheet> with ControllerDisp
       );
     }
 
-    final children = <Widget>[
-      if (_channelResults.isNotEmpty) ...[
-        _buildSectionHeader(context, t.liveTv.channelsSection),
-        for (var i = 0; i < _channelResults.length; i++) _buildChannelTile(_channelResults[i], firstResult: i == 0),
-      ],
-      if (showPrograms && (_programResults.isNotEmpty || _isLoadingPrograms)) ...[
-        _buildSectionHeader(context, t.liveTv.programsSection),
-        if (_isLoadingPrograms)
-          const Padding(
+    // Built by index rather than as a child list: an unfiltered query lists every
+    // channel, and a list would construct all of those tiles on every keystroke.
+    final hasChannels = _channelResults.isNotEmpty;
+    final showProgramSection = showPrograms && (_programResults.isNotEmpty || _isLoadingPrograms);
+    final channelRows = hasChannels ? _channelResults.length + 1 : 0;
+    final programRows = showProgramSection ? (_isLoadingPrograms ? 1 : _programResults.length) + 1 : 0;
+
+    return ListView.builder(
+      padding: const EdgeInsets.only(bottom: 8),
+      itemCount: channelRows + programRows,
+      itemBuilder: (context, index) {
+        if (index < channelRows) {
+          if (index == 0) return _buildSectionHeader(context, t.liveTv.channelsSection);
+          final channelIndex = index - 1;
+          return _buildChannelTile(_channelResults[channelIndex], firstResult: channelIndex == 0);
+        }
+
+        final programRow = index - channelRows;
+        if (programRow == 0) return _buildSectionHeader(context, t.liveTv.programsSection);
+        if (_isLoadingPrograms) {
+          return const Padding(
             padding: EdgeInsets.all(16),
             child: Center(child: SizedBox(width: 24, height: 24, child: CircularProgressIndicator(strokeWidth: 2))),
-          )
-        else
-          for (var i = 0; i < _programResults.length; i++)
-            _buildProgramTile(_programResults[i], firstResult: _channelResults.isEmpty && i == 0),
-      ],
-    ];
-
-    return ListView(padding: const EdgeInsets.only(bottom: 8), children: children);
+          );
+        }
+        final programIndex = programRow - 1;
+        return _buildProgramTile(_programResults[programIndex], firstResult: !hasChannels && programIndex == 0);
+      },
+    );
   }
 
   Widget _buildSectionHeader(BuildContext context, String title) {

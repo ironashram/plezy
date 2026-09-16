@@ -310,10 +310,13 @@ mixin _JellyfinBrowseMethods on _JellyfinClientInternals {
     // top-level views. We expose those as per-library tabs instead of
     // standalone library entries — matches the Plex shape and avoids
     // duplicating the same data in two navigation slots.
+    //
+    // Live TV goes for the same reason, against its own navigation tab. Its view
+    // id backs no folder, so browsing it returns every series on the server.
     return items
         .where((view) {
           final ct = (view['CollectionType'] as String?)?.toLowerCase();
-          return ct != 'boxsets' && ct != 'playlists';
+          return ct != 'boxsets' && ct != 'playlists' && ct != 'livetv';
         })
         .map((view) => JellyfinMappers.library(view, serverId: serverId, serverName: serverName, dialect: dialect))
         .whereType<MediaLibrary>()
