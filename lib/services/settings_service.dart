@@ -655,6 +655,10 @@ class SettingsService extends BaseSharedPreferencesService {
   static const resumeMusicOnLaunch = BoolPref('resume_music_on_launch', defaultValue: true);
   static const autoPlayNextEpisode = BoolPref('auto_play_next_episode', defaultValue: true);
 
+  /// Shuffled video queues start every episode at 0:00 instead of resuming
+  /// from the server-side view offset (#2303). Off preserves resume behavior.
+  static const shuffleStartsFromBeginning = BoolPref('shuffle_starts_from_beginning');
+
   /// Seconds the Play Next prompt counts down before auto-advancing (#1827).
   /// 0 skips the prompt entirely and starts the next episode immediately.
   /// Only consulted while [autoPlayNextEpisode] is on.
@@ -1317,6 +1321,7 @@ class SettingsService extends BaseSharedPreferencesService {
     resumeMusicOnLaunch,
     autoPlayNextEpisode,
     playNextCountdown,
+    shuffleStartsFromBeginning,
     gestureBrightnessSwipe,
     gestureVolumeSwipe,
     gesturePinchToZoom,

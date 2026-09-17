@@ -73,13 +73,46 @@ class IecCarrierSinkTest {
   ) = IecCarrierSink(normal, carrier, { routeAvailable }, { blocked })
 
   /**
-   * TrueHD is the carrier or it is decoded. Falling through to the normal sink would hand media3
-   * its raw ENCODING_DOLBY_TRUEHD path, which is the configuration that wedges on these devices.
+   * Fork behaviour, diverging from upstream: with no carrier route the answer is deferred to the
+   * normal sink instead of being reported unsupported here.
+   *
+   * Upstream decodes every TrueHD stream on such a route, because media3's raw
+   * ENCODING_DOLBY_TRUEHD path is what wedges the devices behind #1804. That also decodes on a
+   * route which publishes AUDIO_FORMAT_DOLBY_TRUEHD and drains it correctly but publishes no
+   * AUDIO_FORMAT_IEC61937 profile, so the carrier probe fails: an eARC chain that bitstreams raw
+   * TrueHD for other players gets 8-channel PCM from this sink instead, which it will not render.
+   *
+   * Deferring puts the answer where the capabilities are. media3 consults the same
+   * AudioCapabilities it will use to configure the track, so a route that does not publish the
+   * encoding still lands on the decoder.
    */
   @Test
-  fun trueHdWithoutACarrierRouteIsReportedUnsupportedSoItDecodes() {
+  fun trueHdWithoutACarrierRouteDefersToTheNormalSink() {
     val normal = FakeSink().apply { formatSupport = AudioSink.SINK_FORMAT_SUPPORTED_DIRECTLY }
     val carrierSink = sink(normal = normal, routeAvailable = false)
+
+    assertTrue(carrierSink.supportsFormat(trueHdFormat()))
+    assertEquals(AudioSink.SINK_FORMAT_SUPPORTED_DIRECTLY, carrierSink.getFormatSupport(trueHdFormat()))
+  }
+
+  /** A route the normal sink cannot bitstream still decodes, which is upstream's outcome. */
+  @Test
+  fun trueHdWithoutACarrierRouteDecodesWhenTheNormalSinkCannotBitstreamIt() {
+    val normal = FakeSink().apply { formatSupport = AudioSink.SINK_FORMAT_UNSUPPORTED }
+    val carrierSink = sink(normal = normal, routeAvailable = false)
+
+    assertFalse(carrierSink.supportsFormat(trueHdFormat()))
+    assertEquals(AudioSink.SINK_FORMAT_UNSUPPORTED, carrierSink.getFormatSupport(trueHdFormat()))
+  }
+
+  /**
+   * Downmix, normalization and the user's passthrough setting all report through
+   * `directOutputBlocked`, and each must keep forcing decoded PCM whatever the route publishes.
+   */
+  @Test
+  fun trueHdIsUnsupportedWhenDirectOutputIsBlockedEvenIfTheNormalSinkWouldTakeIt() {
+    val normal = FakeSink().apply { formatSupport = AudioSink.SINK_FORMAT_SUPPORTED_DIRECTLY }
+    val carrierSink = sink(normal = normal, routeAvailable = false, blocked = true)
 
     assertFalse(carrierSink.supportsFormat(trueHdFormat()))
     assertEquals(AudioSink.SINK_FORMAT_UNSUPPORTED, carrierSink.getFormatSupport(trueHdFormat()))

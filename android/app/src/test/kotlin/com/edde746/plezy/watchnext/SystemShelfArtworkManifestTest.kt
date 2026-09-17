@@ -15,7 +15,13 @@ import org.w3c.dom.Element
 class SystemShelfArtworkManifestTest {
   private companion object {
     const val ANDROID_NAMESPACE = "http://schemas.android.com/apk/res/android"
-    const val AUTHORITY = "com.edde746.plezy.systemshelf.artwork"
+
+    /**
+     * Read from the unprocessed manifest, so this is the placeholder rather than a built
+     * authority. The fork suffixes its applicationId to install beside an official build, and two
+     * apps cannot share a provider authority, so the literal upstream matches is not present.
+     */
+    const val AUTHORITY = "\${applicationId}.systemshelf.artwork"
     val MANIFEST_CANDIDATES = listOf(
       "src/main/AndroidManifest.xml",
       "app/src/main/AndroidManifest.xml",
