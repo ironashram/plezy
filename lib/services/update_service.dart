@@ -2,6 +2,7 @@ import 'dart:io';
 
 import 'package:flutter/foundation.dart';
 import 'package:auto_updater/auto_updater.dart';
+import 'package:device_info_plus/device_info_plus.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:plezy/utils/app_logger.dart';
 import 'package:plezy/utils/media_server_http_client.dart';
@@ -176,7 +177,7 @@ class UpdateService {
             'currentVersion': currentVersion,
             'latestVersion': cleanVersion,
             'releaseUrl': data['html_url'] as String,
-            'apkUrl': _apkAssetUrl(data['assets']),
+            'apkUrl': await _apkAssetUrl(data['assets']),
             'releaseName': data['name'] as String? ?? 'Version $cleanVersion',
             'releaseNotes': data['body'] as String? ?? '',
             'publishedAt': data['published_at'] as String,
@@ -210,21 +211,49 @@ class UpdateService {
     return _performUpdateCheck(respectCooldown: true);
   }
 
-  /// Parse version string into list of integers
-  /// Handles versions like "1.2.3+4" by taking only the numeric parts
-  /// Download URL of the release's Android package, when the release ships one.
-  static String? _apkAssetUrl(Object? assets) {
+  /// Download URL of the release's Android package for this device.
+  ///
+  /// A release carries one package per ABI, so the asset has to be matched
+  /// against what the device actually runs. Taking the first `.apk` would hand
+  /// an arm64 phone the armeabi-v7a build, which installs and then fails, or a
+  /// 32-bit device the arm64 one, which refuses with INSTALL_FAILED_NO_MATCHING_ABIS.
+  /// With no match the caller gets null and the dialog falls back to the release
+  /// page rather than offering a package that cannot run here.
+  static Future<String?> _apkAssetUrl(Object? assets) async {
     if (assets is! List) return null;
+
+    final packages = <String, String>{};
     for (final asset in assets) {
       if (asset is! Map) continue;
       final name = asset['name'];
-      if (name is! String || !name.toLowerCase().endsWith('.apk')) continue;
       final url = asset['browser_download_url'];
-      if (url is String) return url;
+      if (name is! String || url is! String) continue;
+      if (name.toLowerCase().endsWith('.apk')) packages[name.toLowerCase()] = url;
+    }
+    if (packages.length < 2) return packages.isEmpty ? null : packages.values.first;
+
+    for (final abi in await _supportedAbis()) {
+      final needle = abi.toLowerCase();
+      for (final entry in packages.entries) {
+        if (entry.key.contains(needle)) return entry.value;
+      }
     }
     return null;
   }
 
+  /// The device's ABIs, most preferred first. Empty off Android.
+  static Future<List<String>> _supportedAbis() async {
+    if (!Platform.isAndroid) return const [];
+    try {
+      return (await DeviceInfoPlugin().androidInfo).supportedAbis;
+    } catch (error, stackTrace) {
+      appLogger.e('Failed to read the supported ABIs', error: error, stackTrace: stackTrace);
+      return const [];
+    }
+  }
+
+  /// Parse version string into list of integers
+  /// Handles versions like "1.2.3+4" by taking only the numeric parts
   static List<int> _parseVersionParts(String version) {
     return version.split('.').map((p) {
       final numPart = p.split('+').first.split('-').first;
