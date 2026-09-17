@@ -111,7 +111,7 @@ class _DiscoverScreenState extends State<DiscoverScreen>
   /// Primary focus when the rail claim was armed; see [_railClaimAbandoned].
   FocusNode? _railClaimFocusOrigin;
 
-  GlobalKey<HubSectionState>? _continueWatchingHubKey;
+  final Map<String, GlobalKey<HubSectionState>> _playbackHubKeys = {};
   final Map<String, GlobalKey<HubSectionState>> _hubKeysByIdentity = {};
   List<GlobalKey<HubSectionState>> _orderedHubKeys = const [];
   final _tvBrowseRailKey = GlobalKey<TvBrowseRailState>();
@@ -154,17 +154,15 @@ class _DiscoverScreenState extends State<DiscoverScreen>
     }
     _hubKeysByIdentity.removeWhere((identity, _) => !liveIdentities.contains(identity));
     _orderedHubKeys = ordered;
-    _continueWatchingHubKey ??= GlobalKey<HubSectionState>();
   }
 
-  List<GlobalKey<HubSectionState>> get _allHubKeys {
-    final keys = <GlobalKey<HubSectionState>>[];
-    if (_continueWatchingHubKey != null && _onDeck.isNotEmpty) {
-      keys.add(_continueWatchingHubKey!);
-    }
-    keys.addAll(_orderedHubKeys);
-    return keys;
-  }
+  GlobalKey<HubSectionState> _playbackHubKey(MediaHub hub) =>
+      _playbackHubKeys.putIfAbsent(hub.id, GlobalKey<HubSectionState>.new);
+
+  List<GlobalKey<HubSectionState>> get _allHubKeys => [
+    for (final hub in _playbackHubs) _playbackHubKey(hub),
+    ..._orderedHubKeys,
+  ];
 
   bool get _isHeroSectionVisible => _onDeck.isNotEmpty && context.settingsRead(SettingsService.showHeroSection);
 
@@ -173,31 +171,71 @@ class _DiscoverScreenState extends State<DiscoverScreen>
   // rebuilds hand TvBrowseRail the same hubs list and its didUpdateWidget
   // fast path — and the cached rail widget below — kick in.
   List<MediaHub>? _tvBrowseHubsCache;
-  (List<MediaItem>, List<MediaHub>, bool, String)? _tvBrowseHubsCacheKey;
+  (List<MediaItem>, List<MediaHub>, bool, String, bool)? _tvBrowseHubsCacheKey;
 
   List<MediaHub> get _tvBrowseHubs {
-    final key = (_onDeck, _hubs, _hasMoreContinueWatching, t.discover.continueWatching);
+    final key = (_onDeck, _hubs, _hasMoreContinueWatching, t.discover.continueWatching, _separateNextUpRow);
     if (_tvBrowseHubsCache != null && key == _tvBrowseHubsCacheKey) return _tvBrowseHubsCache!;
-    final hubs = <MediaHub>[];
-    if (_onDeck.isNotEmpty) {
-      hubs.add(_continueWatchingHub);
-    }
-    hubs.addAll(_hubs.where((hub) => hub.items.isNotEmpty));
+    final hubs = [..._playbackHubs, ..._hubs.where((hub) => hub.items.isNotEmpty)];
     _tvBrowseHubsCache = hubs;
     _tvBrowseHubsCacheKey = key;
     return hubs;
   }
 
-  /// The synthesized Continue Watching row, rendered ahead of the backend hubs
-  /// on both the mobile list and the TV rail.
-  MediaHub get _continueWatchingHub => MediaHub(
+  bool get _separateNextUpRow => context.settingsRead(SettingsService.separateNextUpRow);
+
+  /// The synthesized playback rows, rendered ahead of the backend hubs on both
+  /// the mobile list and the TV rail.
+  ///
+  /// Backends hand the app one on-deck list mixing started items with the next
+  /// unwatched episode of a series (Jellyfin merges `/Shows/NextUp` into it in
+  /// `fetchContinueWatching`, Plex's `/library/onDeck` is natively both), which
+  /// reads as one row of unrelated things. A playback position splits them
+  /// without a second request: measured against Jellyfin 10.11, every
+  /// `/UserItems/Resume` row carries a non-zero position and every
+  /// `/Shows/NextUp` row carries zero.
+  ///
+  /// Deliberately not [MediaItem.hasActiveProgress], which also requires a
+  /// known duration: a row whose duration never arrived would then land under
+  /// Next Up despite having been started.
+  List<MediaHub> get _playbackHubs {
+    if (_onDeck.isEmpty) return const [];
+    if (!_separateNextUpRow) return [_continueWatchingHub(_onDeck)];
+
+    final resume = <MediaItem>[];
+    final nextUp = <MediaItem>[];
+    for (final item in _onDeck) {
+      ((item.viewOffsetMs ?? 0) > 0 ? resume : nextUp).add(item);
+    }
+    return [
+      if (resume.isNotEmpty) _continueWatchingHub(resume),
+      if (nextUp.isNotEmpty) _nextUpHub(nextUp),
+    ];
+  }
+
+  /// [more] rides this row alone: loading more pulls more of the one on-deck
+  /// list, which the split above then redistributes across both rows.
+  MediaHub _continueWatchingHub(List<MediaItem> items) => MediaHub(
     id: 'continue_watching',
     title: t.discover.continueWatching,
     type: 'mixed',
     identifier: '_continue_watching_',
-    size: _onDeck.length + (_hasMoreContinueWatching ? 1 : 0),
+    size: items.length + (_hasMoreContinueWatching ? 1 : 0),
     more: _hasMoreContinueWatching,
-    items: _onDeck,
+    items: items,
+  );
+
+  /// `nextup` as the id and identifier is load-bearing: it makes
+  /// [MediaHub.usesContinueWatchingAction] true so the row honors the
+  /// Continue Watching tap preference, while [MediaHub.isContinueWatchingHub]
+  /// stays false so these items get no remove-from-Continue-Watching action.
+  MediaHub _nextUpHub(List<MediaItem> items) => MediaHub(
+    id: 'nextup',
+    title: t.discover.nextUp,
+    type: 'episode',
+    identifier: '_nextup_',
+    size: items.length,
+    items: items,
   );
 
   void _setSpotlightItem(MediaItem item) => _spotlight.select(item);
@@ -925,6 +963,7 @@ class _DiscoverScreenState extends State<DiscoverScreen>
       prefs: const [
         SettingsService.showServerNameOnHubs,
         SettingsService.showHeroSection,
+        SettingsService.separateNextUpRow,
         SettingsService.hideSpoilers,
         SettingsService.libraryDensity,
         SettingsService.episodePosterMode,
@@ -946,7 +985,7 @@ class _DiscoverScreenState extends State<DiscoverScreen>
 
     final bottomPadding = MediaQuery.paddingOf(context).bottom;
     final theme = Theme.of(context);
-    final continueWatchingHub = _onDeck.isEmpty ? null : _continueWatchingHub;
+    final playbackHubs = _playbackHubs;
     return Material(
       color: theme.scaffoldBackgroundColor,
       child: Stack(
@@ -969,19 +1008,20 @@ class _DiscoverScreenState extends State<DiscoverScreen>
               if (_isLoading) LoadingIndicatorBox.sliver,
               if (_errorMessage != null) SliverErrorState(message: _errorMessage!, onRetry: _discover.load),
               if (!_isLoading && _errorMessage == null) ...[
-                if (continueWatchingHub != null)
+                for (int i = 0; i < playbackHubs.length; i++)
                   SliverToBoxAdapter(
                     child: HubSection(
-                      key: _continueWatchingHubKey,
-                      hub: continueWatchingHub,
+                      key: _playbackHubKey(playbackHubs[i]),
+                      hub: playbackHubs[i],
                       focusMemory: _hubFocusMemory,
-                      icon: hubIconFor(continueWatchingHub),
+                      icon: hubIconFor(playbackHubs[i]),
                       onRefresh: _discover.updateItem,
                       onRemoveFromContinueWatching: _discover.refreshContinueWatching,
-                      isInContinueWatching: true,
-                      loadMoreItems: _discover.loadAllContinueWatching,
-                      onVerticalNavigation: (isUp) => _handleVerticalNavigation(0, isUp),
-                      onNavigateUp: _focusTopBoundary,
+                      isInContinueWatching: playbackHubs[i].isContinueWatchingHub,
+                      usesContinueWatchingAction: playbackHubs[i].usesContinueWatchingAction,
+                      loadMoreItems: playbackHubs[i].more ? _discover.loadAllContinueWatching : null,
+                      onVerticalNavigation: (isUp) => _handleVerticalNavigation(i, isUp),
+                      onNavigateUp: i == 0 ? _focusTopBoundary : null,
                       onNavigateToSidebar: _navigateToSidebar,
                     ),
                   ),
@@ -996,9 +1036,10 @@ class _DiscoverScreenState extends State<DiscoverScreen>
                       icon: hubIconFor(_hubs[i]),
                       showServerName: showServerNameOnHubs || hubsSpanMultipleServers,
                       onRefresh: _discover.updateItem,
-                      // Hub index is i + 1 if continue watching exists, otherwise i
-                      onVerticalNavigation: (isUp) => _handleVerticalNavigation(_onDeck.isNotEmpty ? i + 1 : i, isUp),
-                      onNavigateUp: (i == 0 && _onDeck.isEmpty) ? _focusTopBoundary : null,
+                      // The synthesized playback rows come first, so they offset
+                      // every backend hub's index in the focus-key list.
+                      onVerticalNavigation: (isUp) => _handleVerticalNavigation(playbackHubs.length + i, isUp),
+                      onNavigateUp: (i == 0 && playbackHubs.isEmpty) ? _focusTopBoundary : null,
                       onNavigateToSidebar: _navigateToSidebar,
                     ),
                   ),
@@ -1077,7 +1118,9 @@ class _DiscoverScreenState extends State<DiscoverScreen>
     return _tvBrowseRailWidget = TvBrowseRail(
       key: _tvBrowseRailKey,
       hubs: browseHubs,
-      initialHubId: 'continue_watching',
+      // Continue Watching leads when it has rows, but with the split on it can
+      // be empty while Next Up is not, and the rail has to land there instead.
+      initialHubId: browseHubs.isNotEmpty && browseHubs.first.id == 'nextup' ? 'nextup' : 'continue_watching',
       focusMemory: _hubFocusMemory,
       showServerName: showServerName,
       iconForHub: (hub, _) => hubIconFor(hub),

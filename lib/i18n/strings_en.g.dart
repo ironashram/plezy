@@ -531,6 +531,12 @@ class Translations$settings$en {
 	/// en: 'Show unified home hubs. Otherwise use library recommendations.'
 	String get useGlobalHubsDescription => 'Show unified home hubs. Otherwise use library recommendations.';
 
+	/// en: 'Separate Next Up Row'
+	String get separateNextUpRow => 'Separate Next Up Row';
+
+	/// en: 'Split Continue Watching into what you started and what comes next.'
+	String get separateNextUpRowDescription => 'Split Continue Watching into what you started and what comes next.';
+
 	/// en: 'Show Server Name on Hubs'
 	String get showServerNameOnHubs => 'Show Server Name on Hubs';
 
@@ -7205,6 +7211,8 @@ extension on Translations {
 			'settings.episodeDetails' => 'Open Details',
 			'settings.useGlobalHubs' => 'Use Home Layout',
 			'settings.useGlobalHubsDescription' => 'Show unified home hubs. Otherwise use library recommendations.',
+			'settings.separateNextUpRow' => 'Separate Next Up Row',
+			'settings.separateNextUpRowDescription' => 'Split Continue Watching into what you started and what comes next.',
 			'settings.showServerNameOnHubs' => 'Show Server Name on Hubs',
 			'settings.showServerNameOnHubsDescription' => 'Always show server names in hub titles.',
 			'settings.groupLibrariesByServer' => 'Group Libraries by Server',
@@ -7565,10 +7573,10 @@ extension on Translations {
 			'fileInfo.matchScore' => 'Match Score',
 			'fileInfo.externalDelivery' => 'Can Be Served Separately',
 			'fileInfo.sidecarPath' => 'Sidecar Path',
-			'fileInfo.sourceStream' => 'Copied From',
-			'fileInfo.temporary' => 'Temporary',
 			_ => null,
 		} ?? switch (path) {
+			'fileInfo.sourceStream' => 'Copied From',
+			'fileInfo.temporary' => 'Temporary',
 			'fileInfo.timeBase' => 'Time Base',
 			'fileInfo.overallBitrate' => 'Overall Bitrate',
 			'fileInfo.path' => 'Path',
@@ -8079,10 +8087,10 @@ extension on Translations {
 			'libraries.sortBy' => 'Sort By',
 			'libraries.filters' => 'Filters',
 			'libraries.confirmActionMessage' => 'Are you sure you want to perform this action?',
-			'libraries.showLibrary' => 'Show library',
-			'libraries.hideLibrary' => 'Hide library',
 			_ => null,
 		} ?? switch (path) {
+			'libraries.showLibrary' => 'Show library',
+			'libraries.hideLibrary' => 'Hide library',
 			'libraries.libraryOptions' => 'Library options',
 			'libraries.content' => 'library content',
 			'libraries.selectLibrary' => 'Select library',
@@ -8593,10 +8601,10 @@ extension on Translations {
 			'downloads.cancelledDownloadMessage' => 'This download was canceled. What would you like to do?',
 			'downloads.allEpisodesAlreadyDownloaded' => 'All episodes already downloaded',
 			'downloads.resumeDownload' => 'Resume download',
-			'downloads.cancelledDownload' => 'Canceled download',
-			'downloads.syncingFile' => ({required Object file, required Object status}) => '${file} (syncing ${status})',
 			_ => null,
 		} ?? switch (path) {
+			'downloads.cancelledDownload' => 'Canceled download',
+			'downloads.syncingFile' => ({required Object file, required Object status}) => '${file} (syncing ${status})',
 			'downloads.downloadedFileClickToComplete' => ({required Object file}) => 'Downloaded ${file} - Click to complete',
 			'downloads.partialDownloadClickToComplete' => 'Partially downloaded - Click to complete',
 			'downloads.deleting' => 'Deleting...',

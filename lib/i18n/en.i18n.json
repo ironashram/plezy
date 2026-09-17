@@ -164,6 +164,8 @@
     "episodeDetails": "Open Details",
     "useGlobalHubs": "Use Home Layout",
     "useGlobalHubsDescription": "Show unified home hubs. Otherwise use library recommendations.",
+    "separateNextUpRow": "Separate Next Up Row",
+    "separateNextUpRowDescription": "Split Continue Watching into what you started and what comes next.",
     "showServerNameOnHubs": "Show Server Name on Hubs",
     "showServerNameOnHubsDescription": "Always show server names in hub titles.",
     "groupLibrariesByServer": "Group Libraries by Server",
