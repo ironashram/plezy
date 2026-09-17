@@ -26,6 +26,7 @@ import 'media_library.dart';
 import 'media_playlist.dart';
 import 'playback_report_metadata.dart';
 import 'server_capabilities.dart';
+import 'subtitle_search_result.dart';
 
 /// Default number of items requested for horizontal hub previews.
 const int defaultHubPreviewLimit = 20;
@@ -797,6 +798,20 @@ abstract class MediaServerClient {
   /// `PlaybackInitializationService` — backends always produce online
   /// metadata, even when the caller intends to play a downloaded copy.
   Future<PlaybackInitializationResult> getPlaybackInitialization(PlaybackInitializationOptions options);
+
+  /// Ask the server's subtitle providers for [itemId], in [language] as an ISO
+  /// 639-1 code. [title] narrows the search when the item's own title is a poor
+  /// query. Returns an empty list when no provider answers. Only call it when
+  /// [ServerCapabilities.externalSubtitleSearch] is set.
+  Future<List<SubtitleSearchResult>> searchSubtitles(String itemId, {required String language, String? title});
+
+  /// Have the server fetch [result] and attach it to [itemId]. The file lands
+  /// asynchronously, so the new track appears on a later metadata read rather
+  /// than the moment this returns.
+  ///
+  /// [language] is the ISO 639-1 code the search ran under, used only when
+  /// [result] carries none of its own.
+  Future<bool> downloadSubtitle(String itemId, SubtitleSearchResult result, {String? language});
 
   /// Backend-neutral live-TV operations. Always returns a wrapper; consult
   /// [LiveTvSupport.isAvailable] to find out whether the server actually

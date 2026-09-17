@@ -23,6 +23,7 @@ import '../media/ids.dart';
 import '../media/media_server_client.dart';
 import '../media/playback_report_metadata.dart';
 import '../media/server_capabilities.dart';
+import '../media/subtitle_search_result.dart';
 import '../media/library_change_event.dart';
 import 'library_events/plex_library_event_socket.dart';
 import '../utils/external_ids.dart';
@@ -1434,27 +1435,25 @@ class PlexClient
 
   /// Search for subtitles from external providers (e.g. OpenSubtitles) via the Plex server.
   /// [language] is an ISO 639-1 two-letter code (e.g. "en", "es").
-  Future<List<PlexSubtitleSearchResult>> searchSubtitles(
-    String ratingKey, {
-    required String language,
-    String? title,
-    int hearingImpaired = 0,
-    int forced = 0,
-  }) async {
-    return _wrapListApiCall<PlexSubtitleSearchResult>(
+  @override
+  Future<List<SubtitleSearchResult>> searchSubtitles(String ratingKey, {required String language, String? title}) async {
+    return _wrapListApiCall<SubtitleSearchResult>(
       () => _http.get(
         '/library/metadata/$ratingKey/subtitles',
         queryParameters: {
           'language': language,
           if (title != null && title.isNotEmpty) 'title': title,
-          'hearingImpaired': hearingImpaired,
-          'forced': forced,
+          'hearingImpaired': 0,
+          'forced': 0,
         },
       ),
       (response) {
         final container = _getMediaContainer(response);
         final streams = container?['Stream'] as List? ?? [];
-        return streams.map((s) => PlexSubtitleSearchResult.fromJson(s as Map<String, dynamic>)).toList();
+        return [
+          for (final stream in streams)
+            _mapPlexSubtitle(PlexSubtitleSearchResult.fromJson(stream as Map<String, dynamic>)),
+        ];
       },
       'Failed to search subtitles',
     );
@@ -1462,30 +1461,36 @@ class PlexClient
 
   /// Download a subtitle from an external provider and add it to the media item.
   /// The server downloads the file asynchronously; the new stream appears after a short delay.
-  Future<bool> downloadSubtitle(
-    String ratingKey, {
-    required String key,
-    required String codec,
-    required String language,
-    required bool hearingImpaired,
-    required bool forced,
-    required String providerTitle,
-  }) async {
+  @override
+  Future<bool> downloadSubtitle(String ratingKey, SubtitleSearchResult result, {String? language}) async {
     return _wrapBoolApiCall(
       () => _http.put(
         '/library/metadata/$ratingKey/subtitles',
         queryParameters: {
-          'key': key,
-          'codec': codec,
-          'language': language,
-          'hearingImpaired': hearingImpaired ? 1 : 0,
-          'forced': forced ? 1 : 0,
-          'providerTitle': providerTitle,
+          'key': result.key,
+          'codec': result.codec ?? 'srt',
+          'language': result.languageCode ?? language ?? '',
+          'hearingImpaired': result.hearingImpaired ? 1 : 0,
+          'forced': result.forced ? 1 : 0,
+          'providerTitle': result.providerTitle ?? '',
         },
       ),
       'Failed to download subtitle',
     );
   }
+
+  SubtitleSearchResult _mapPlexSubtitle(PlexSubtitleSearchResult result) => SubtitleSearchResult(
+    key: result.key,
+    title: result.title,
+    displayTitle: result.displayTitle,
+    codec: result.codec,
+    languageCode: result.languageCode,
+    score: result.score,
+    providerTitle: result.providerTitle,
+    hearingImpaired: result.hearingImpaired,
+    forced: result.forced,
+    perfectMatch: result.perfectMatch,
+  );
 
   /// Search across all libraries including individually shared items.
   /// Uses /library/search (same endpoint as Plex Web) which finds shared content.

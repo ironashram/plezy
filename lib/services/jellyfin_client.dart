@@ -34,6 +34,7 @@ import '../media/ids.dart';
 import '../media/media_server_client.dart';
 import '../media/playback_report_metadata.dart';
 import '../media/server_capabilities.dart';
+import '../media/subtitle_search_result.dart';
 import '../models/audio_quality_preset.dart';
 import '../models/jellyfin/jellyfin_account_preferences.dart';
 import '../models/jellyfin/jellyfin_display_preferences.dart';
@@ -62,6 +63,7 @@ import '../exceptions/media_server_exceptions.dart';
 import '../i18n/strings.g.dart';
 import '../utils/json_utils.dart';
 import '../utils/jellyfin_time.dart';
+import '../utils/language_codes.dart';
 import 'jellyfin_auth_header.dart';
 import 'jellyfin_endpoint_discovery.dart';
 import '../media/download_resolution.dart';
@@ -96,6 +98,7 @@ part 'jellyfin_client/parts/live_tv.dart';
 part 'jellyfin_client/parts/live_tv_dvr.dart';
 part 'jellyfin_client/parts/images_downloads.dart';
 part 'jellyfin_client/parts/metadata_edit.dart';
+part 'jellyfin_client/parts/subtitles.dart';
 
 /// Canonical declarations of the [JellyfinClient] internals that the `part`
 /// mixins call into.
@@ -241,7 +244,8 @@ class JellyfinClient
         _JellyfinFileInfoMethods,
         _JellyfinLiveTvMethods,
         _JellyfinImageDownloadMethods,
-        _JellyfinMetadataEditMethods
+        _JellyfinMetadataEditMethods,
+        _JellyfinSubtitleMethods
     implements
         MediaServerClient,
         SeasonEpisodePagingClient,

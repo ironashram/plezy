@@ -9,7 +9,7 @@ import '../../../focus/focusable_text_field.dart';
 import '../../../focus/input_mode_tracker.dart';
 import '../../../i18n/strings.g.dart';
 import '../../../mixins/controller_disposer_mixin.dart';
-import '../../../models/plex/plex_subtitle_search_result.dart';
+import '../../../media/subtitle_search_result.dart';
 import '../../../services/settings_service.dart';
 import '../../../utils/language_codes.dart';
 import '../../../utils/provider_extensions.dart';
@@ -57,7 +57,7 @@ class _SubtitleSearchSheetState extends State<SubtitleSearchSheet> with Controll
   final _firstResultFocusNode = FocusNode(debugLabel: 'SubtitleSearch_firstResult');
   Timer? _debounceTimer;
 
-  List<PlexSubtitleSearchResult>? _results;
+  List<SubtitleSearchResult>? _results;
   bool _isSearching = false;
   String? _error;
   String? _downloadingKey;
@@ -102,7 +102,7 @@ class _SubtitleSearchSheetState extends State<SubtitleSearchSheet> with Controll
     });
 
     try {
-      final client = context.tryGetPlexClientForServer(ServerId(widget.serverId));
+      final client = context.tryGetMediaClientForServer(ServerId(widget.serverId));
       if (client == null) {
         if (!mounted || generation != _searchGeneration) return;
         setState(() => _isSearching = false);
@@ -178,26 +178,18 @@ class _SubtitleSearchSheetState extends State<SubtitleSearchSheet> with Controll
     _search();
   }
 
-  Future<void> _downloadSubtitle(PlexSubtitleSearchResult result) async {
+  Future<void> _downloadSubtitle(SubtitleSearchResult result) async {
     if (_downloadingKey != null) return;
     setState(() => _downloadingKey = result.key);
 
     try {
-      final client = context.tryGetPlexClientForServer(ServerId(widget.serverId));
+      final client = context.tryGetMediaClientForServer(ServerId(widget.serverId));
       if (client == null) {
         if (!mounted) return;
         setState(() => _downloadingKey = null);
         return;
       }
-      final success = await client.downloadSubtitle(
-        widget.ratingKey,
-        key: result.key,
-        codec: result.codec ?? 'srt',
-        language: result.languageCode ?? _languageCode,
-        hearingImpaired: result.hearingImpaired,
-        forced: result.forced,
-        providerTitle: result.providerTitle ?? '',
-      );
+      final success = await client.downloadSubtitle(widget.ratingKey, result, language: _languageCode);
 
       if (!mounted) return;
 
@@ -206,7 +198,8 @@ class _SubtitleSearchSheetState extends State<SubtitleSearchSheet> with Controll
             await widget.onSubtitleDownloaded?.call(serverId: widget.serverId, ratingKey: widget.ratingKey) ??
             SubtitleDownloadApplyOutcome.unavailable;
         if (!mounted) return;
-        if (outcome == SubtitleDownloadApplyOutcome.applied) {
+        if (outcome == SubtitleDownloadApplyOutcome.applied ||
+            outcome == SubtitleDownloadApplyOutcome.notApplicable) {
           showSuccessSnackBar(context, t.videoControls.subtitleDownloaded);
           OverlaySheetController.of(context).close();
         } else {

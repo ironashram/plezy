@@ -10,7 +10,10 @@ import '../../../services/playback_subtitle_resolver.dart';
 import '../../../services/shader_service.dart';
 import '../helpers/track_filter_helper.dart';
 
-enum SubtitleDownloadApplyOutcome { applied, timedOut, busy, superseded, unavailable, failed }
+/// [notApplicable]: the download succeeded and this backend has no in-player
+/// apply step. Jellyfin selects the new track from the server's own subtitle
+/// preferences on the next source read, so nothing here has to switch it.
+enum SubtitleDownloadApplyOutcome { applied, notApplicable, timedOut, busy, superseded, unavailable, failed }
 
 /// Immutable configuration for track/chapter control widgets.
 class TrackControlsState {

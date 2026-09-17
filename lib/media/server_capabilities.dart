@@ -38,8 +38,11 @@ class ServerCapabilities {
   /// playback progress. Plex exposes this directly; Jellyfin does not.
   final bool continueWatchingRemoval;
 
-  /// External subtitle search/marketplace (Plex `/library/metadata/{id}/subtitles`).
-  /// Hides the "Search subtitles" affordance when false.
+  /// External subtitle search/marketplace (Plex `/library/metadata/{id}/subtitles`,
+  /// Jellyfin `/Items/{id}/RemoteSearch/Subtitles/{lang}`). Hides the "Search
+  /// subtitles" affordance when false. Both backends answer with an empty list
+  /// rather than an error when no provider plugin is configured server-side, so
+  /// this flag only promises the endpoints exist.
   final bool externalSubtitleSearch;
 
   /// Server exposes metadata edit endpoints. Hides edit affordances when false.
@@ -111,6 +114,10 @@ class ServerCapabilities {
   /// `liveTv` is `true` because Jellyfin exposes `/LiveTv/Channels` and
   /// `/LiveTv/Programs`; `liveTvDvr` rides the timer APIs
   /// (`/LiveTv/Timers`, `/LiveTv/SeriesTimers`).
+  ///
+  /// `externalSubtitleSearch` rides `/Items/{id}/RemoteSearch/Subtitles`, which
+  /// is verified on Jellyfin only. Emby's route of the same name stays off
+  /// until it can be tested against a real server.
   static const ServerCapabilities jellyfin = ServerCapabilities(
     liveTv: true,
     liveTvDvr: true,
@@ -118,7 +125,7 @@ class ServerCapabilities {
     richHubs: false,
     numericUserRating: false,
     userFavorites: true,
-    externalSubtitleSearch: false,
+    externalSubtitleSearch: true,
     richMetadataEdit: true,
     scrubThumbnails: true,
     folderGrouping: true,
