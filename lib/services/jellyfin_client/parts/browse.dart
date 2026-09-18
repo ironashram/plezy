@@ -103,7 +103,7 @@ const _baseHubRowFields = 'Overview,DateCreated';
 /// Jellyfin web's `maxDaysForNextUp` default. Without it the server's
 /// `GetNextUpSeriesKeys` scan is unbounded over every series the user has ever
 /// played an episode of.
-const _nextUpDateCutoffDays = 365;
+const _nextUpDateCutoffDays = 3650;
 
 String _nextUpDateCutoff() =>
     DateTime.now().toUtc().subtract(const Duration(days: _nextUpDateCutoffDays)).toIso8601String();
