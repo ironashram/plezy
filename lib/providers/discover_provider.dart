@@ -77,7 +77,7 @@ class DiscoverProvider extends ChangeNotifier with DisposableChangeNotifierMixin
   /// Preview row caps at 20; one extra item is fetched as a probe so
   /// [hasMoreContinueWatching] can show the "more" affordance without a
   /// second request.
-  static const int continueWatchingPreviewLimit = 20;
+  static const int continueWatchingPreviewLimit = 500;
   static const int _continueWatchingProbeLimit = continueWatchingPreviewLimit + 1;
 
   /// Home hubs refetch when the tab is shown or the app resumes after this
