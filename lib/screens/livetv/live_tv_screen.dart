@@ -22,6 +22,7 @@ import '../../utils/app_logger.dart';
 import '../../utils/error_message_utils.dart';
 import '../../utils/desktop_window_padding.dart';
 import '../../utils/live_tv_matching.dart';
+import '../../utils/live_tv_player_navigation.dart';
 import '../../utils/platform_detector.dart';
 import '../../utils/serial_future_queue.dart';
 import '../../utils/snackbar_helper.dart';
@@ -588,8 +589,27 @@ class _LiveTvScreenState extends State<LiveTvScreen>
       isScrollControlled: true,
       builder: (sheetContext) => GuideSearchSheet(
         channels: _channels,
-        onChannelSelected: _jumpToGuideChannel,
-        onProgramSelected: (channel, program) => _jumpToGuideChannel(channel, program: program),
+        onChannelSelected: _openSearchResult,
+        onProgramSelected: (channel, program) => _openSearchResult(channel, program: program),
+      ),
+    );
+  }
+
+  /// A search result the user picked is a request to watch, so tune it.
+  ///
+  /// A future airing cannot be tuned, so that one still lands in the guide at
+  /// its slot, where it can be recorded or read.
+  void _openSearchResult(LiveTvChannel channel, {LiveTvProgram? program}) {
+    if (program != null && !program.isCurrentlyAiring) {
+      _jumpToGuideChannel(channel, program: program);
+      return;
+    }
+    unawaited(
+      navigateToLiveTv(
+        context,
+        multiServer: context.read<MultiServerProvider>(),
+        channel: channel,
+        channels: _channels,
       ),
     );
   }
